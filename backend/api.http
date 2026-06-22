@@ -1,0 +1,73 @@
+@baseUrl = http://localhost:8000/api/v1
+@email = smoke@example.com
+@username = smoketest
+
+### Health Check (No Auth)
+GET http://localhost:8000/health
+
+### Register (First user becomes Admin)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "{{username}}",
+  "email": "{{email}}",
+  "password": "Password123!",
+  "full_name": "Smoke Tester"
+}
+
+###
+
+@token = {{register.response.body.access_token}}
+
+### Get Current User
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### Dashboard - Agent
+GET {{baseUrl}}/dashboard/agent
+Authorization: Bearer {{token}}
+
+### Dashboard - Supervisor (requires supervisor or admin role)
+GET {{baseUrl}}/dashboard/supervisor
+Authorization: Bearer {{token}}
+
+### List Tickets
+GET {{baseUrl}}/tickets?page_size=5
+Authorization: Bearer {{token}}
+
+### Create a Ticket
+# @name createTicket
+POST {{baseUrl}}/tickets
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customer_id": 1,
+  "subject": "Internet is down",
+  "description": "My internet has been down for 2 days",
+  "category": "technical",
+  "priority": "high",
+  "channel": "web"
+}
+
+### 
+
+@ticketId = {{createTicket.response.body.id}}
+
+### Get Ticket Details
+GET {{baseUrl}}/tickets/{{ticketId}}
+Authorization: Bearer {{token}}
+
+### Customer 360 Overview
+GET {{baseUrl}}/customers/1/overview
+Authorization: Bearer {{token}}
+
+### List Knowledge Base Articles
+GET {{baseUrl}}/kb/articles?q=internet
+Authorization: Bearer {{token}}
+
+### List Active Plans
+GET {{baseUrl}}/plans
+Authorization: Bearer {{token}}
