@@ -37,13 +37,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
         eventSource.onmessage = (event) => {
           try {
             const payload = JSON.parse(event.data);
-            if (payload.event === "ping") return;
-            
+            // Only surface events we have a meaningful message for; ignore the rest
+            // (call_queued, agent_status_changed, presence, etc.) so we never show a blank toast.
+            const KNOWN = ["ticket_created", "ticket_assigned", "sla_breached", "call_offered"];
+            if (!KNOWN.includes(payload.event)) return;
+
             let title = "System Notification";
             let msg = "";
             let type: Toast["type"] = "info";
-            
-            if (payload.event === "ticket_created") {
+
+            if (payload.event === "call_offered") {
+              title = "📞 Incoming call";
+              msg = `${(payload.data.intent || "general")} enquiry — open Contact Center to answer`;
+              type = "warning";
+            } else if (payload.event === "ticket_created") {
               title = "🆕 New Ticket Created";
               msg = `Ticket #${payload.data.ticket_number}: ${payload.data.subject}`;
               type = "success";

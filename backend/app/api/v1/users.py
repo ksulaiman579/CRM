@@ -39,10 +39,15 @@ async def set_my_status(
         "status": user.status, "team_id": user.team_id,
     })
 
-    # Going 'ready' pulls the oldest queued call on the agent's team, if any.
     if user.status == "ready":
+        # Pull the oldest queued call on the agent's team, if any.
         from app.core.acd import pull_queued_for_agent
         await pull_queued_for_agent(session, user)
+    elif user.status != "on_call":
+        # Stepping away (break/lunch/offline/etc.) — release any unanswered
+        # ringing call back to the queue so it isn't stuck on this agent.
+        from app.core.acd import requeue_ringing_for_agent
+        await requeue_ringing_for_agent(session, user.id)
 
     return user
 

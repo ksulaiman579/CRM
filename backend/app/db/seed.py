@@ -17,7 +17,8 @@ from app.core.security import hash_password
 from app.core.sla import compute_sla_due_dates
 import sys
 
-engine = create_async_engine(settings.DATABASE_URL, echo=False)
+from app.db.session import _build_connect_args
+engine = create_async_engine(settings.DATABASE_URL, echo=False, connect_args=_build_connect_args())
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 fake = Faker()
 Faker.seed(42)
@@ -217,6 +218,18 @@ async def seed_data(reset=False):
             t.sla_resolution_due = created_at + timedelta(minutes=policy.resolution_mins)
             if t.status in ["resolved", "closed"]:
                 t.resolved_at = created_at + timedelta(hours=random.randint(1, 48))
+                # Most resolved/closed tickets get a CSAT rating (skewed positive).
+                if random.random() < 0.8:
+                    t.csat_rating = random.choices([1, 2, 3, 4, 5], weights=[5, 8, 17, 30, 40])[0]
+                    if random.random() < 0.5:
+                        t.csat_feedback = random.choice([
+                            "Quick and helpful, thank you!",
+                            "Issue resolved on the first call.",
+                            "Agent was polite and professional.",
+                            "Took a while but got sorted in the end.",
+                            "Still not fully happy with the outcome.",
+                            "Great service as always.",
+                        ])
             elif datetime.now(timezone.utc) > t.sla_resolution_due:
                 t.sla_breached = True
             

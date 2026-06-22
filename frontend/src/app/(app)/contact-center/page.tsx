@@ -138,11 +138,20 @@ export default function ContactCenterPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Contact Center</h1>
-        <p className="text-sm text-muted-foreground">
-          Set your status to <span className="font-medium text-emerald-700">Ready</span> (top-right) to receive calls.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Contact Center</h1>
+          <p className="text-sm text-muted-foreground">
+            Set your status to <span className="font-medium text-emerald-700">Ready</span> (top-right) to receive calls.
+          </p>
+        </div>
+        <button
+          onClick={async () => { await fetchWithAuth("/calls/generate?mine=true", { method: "POST" }); }}
+          className="shrink-0 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium shadow-sm hover:bg-secondary transition-colors"
+          title="Inject a test call into your team's queue"
+        >
+          Simulate call to me
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

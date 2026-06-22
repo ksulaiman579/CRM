@@ -59,11 +59,17 @@ async def get_call(call_id: int, session: AsyncSession = Depends(get_db),
 
 
 @router.post("/generate", response_model=CallResponse)
-async def generate(session: AsyncSession = Depends(get_db),
+async def generate(mine: bool = Query(False, description="Force the call onto the caller's team"),
+                   session: AsyncSession = Depends(get_db),
                    current_user: dict = Depends(get_current_user)):
-    """Manually inject a simulated inbound call (handy for demos/testing)."""
+    """Manually inject a simulated inbound call (handy for demos/testing).
+
+    With mine=true, the call is forced onto the caller's team so a Ready agent
+    receives it immediately.
+    """
     from app.core.acd import generate_call
-    call = await generate_call(session)
+    team_id = current_user.get("team_id") if mine else None
+    call = await generate_call(session, team_id=team_id)
     if not call:
         raise AppError("CRM-CALL-002", "Could not generate a call (no customers)", status.HTTP_409_CONFLICT)
     return call

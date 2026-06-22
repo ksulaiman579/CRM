@@ -53,17 +53,29 @@ async def _team_id_for_code(session: AsyncSession, code: str) -> int | None:
     return tid
 
 
-async def generate_call(session: AsyncSession) -> Call | None:
-    """Create one queued inbound call from a random customer, then try to route it."""
+async def generate_call(session: AsyncSession, team_id: int | None = None) -> Call | None:
+    """Create one queued inbound call from a random customer, then try to route it.
+
+    If team_id is given, the call is forced onto that team (used to send a test
+    call straight to a specific team's queue); the intent is chosen to match.
+    """
     cust = (await session.execute(
         select(Customer).order_by(func.random()).limit(1)
     )).scalar_one_or_none()
     if not cust:
         return None
 
-    intent = random.choice(list(INTENT_TEMPLATES.keys()))
-    team_code, lines = INTENT_TEMPLATES[intent]
-    team_id = await _team_id_for_code(session, team_code)
+    if team_id is not None:
+        # Pick an intent whose template routes to this team (fallback: any).
+        from app.models.user import Team
+        code = await session.scalar(select(Team.code).where(Team.id == team_id))
+        matching = [i for i, (tc, _) in INTENT_TEMPLATES.items() if tc == code]
+        intent = random.choice(matching) if matching else random.choice(list(INTENT_TEMPLATES.keys()))
+        lines = INTENT_TEMPLATES[intent][1]
+    else:
+        intent = random.choice(list(INTENT_TEMPLATES.keys()))
+        team_code, lines = INTENT_TEMPLATES[intent]
+        team_id = await _team_id_for_code(session, team_code)
     opening = random.choice(lines).format(name=cust.first_name)
 
     call = Call(
@@ -123,6 +135,44 @@ async def distribute_call(session: AsyncSession, call: Call) -> bool:
         "customer_id": call.customer_id, "team_id": call.team_id,
     })
     return True
+
+
+async def requeue_ringing_for_agent(session: AsyncSession, user_id: int) -> int:
+    """Put any unanswered (ringing) calls offered to this agent back in the queue."""
+    ringing = (await session.execute(
+        select(Call).where(Call.assigned_agent_id == user_id, Call.status == "ringing")
+    )).scalars().all()
+    for c in ringing:
+        c.status = "queued"
+        c.assigned_agent_id = None
+    if ringing:
+        await session.commit()
+        for c in ringing:
+            await broadcast_event("call_queued", {
+                "id": c.id, "call_number": c.call_number, "team_id": c.team_id,
+                "intent": c.intent, "customer_id": c.customer_id,
+            })
+    return len(ringing)
+
+
+async def find_any_ready_agent(session: AsyncSession) -> User | None:
+    """Any ready, free agent across all teams (used to bias call generation)."""
+    return await _find_ready_agent(session, None)
+
+
+async def abandon_stale_calls(session: AsyncSession, minutes: int = 3) -> int:
+    """Abandon calls left queued too long so the queue can't saturate forever."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    stale = (await session.execute(
+        select(Call).where(Call.status == "queued", Call.queued_at < cutoff)
+    )).scalars().all()
+    for c in stale:
+        c.status = "abandoned"
+        c.ended_at = datetime.now(timezone.utc)
+    if stale:
+        await session.commit()
+    return len(stale)
 
 
 async def pull_queued_for_agent(session: AsyncSession, user: User) -> bool:

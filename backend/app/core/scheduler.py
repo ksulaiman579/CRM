@@ -51,18 +51,30 @@ async def sweep_sla_breaches():
         logger.error(f"Error in SLA sweep job: {e}")
 
 async def generate_inbound_calls():
-    """Periodically inject a simulated inbound call, capped so the queue can't run away."""
+    """Periodically inject a simulated inbound call.
+
+    Drains stale queued calls first, biases new calls toward a team that has a
+    ready agent (so ready agents actually get calls), and caps the live queue.
+    """
     try:
         async with AsyncSessionLocal() as session:
             from app.models.call import Call
-            from app.core.acd import generate_call
+            from app.core.acd import generate_call, find_any_ready_agent, abandon_stale_calls
+
+            dropped = await abandon_stale_calls(session, minutes=3)
+            if dropped:
+                logger.info("Call generator: abandoned %s stale queued calls.", dropped)
+
             live = await session.scalar(
                 select(func.count()).select_from(Call).where(Call.status.in_(["queued", "ringing", "active"]))
             ) or 0
             if live >= 15:
                 logger.debug("Call generator: queue at cap (%s), skipping.", live)
                 return
-            call = await generate_call(session)
+
+            # Prefer a team that has a ready agent so the call actually rings.
+            ready = await find_any_ready_agent(session)
+            call = await generate_call(session, team_id=ready.team_id if ready else None)
             if call:
                 logger.info("Call generator: created %s (intent=%s, team=%s).", call.call_number, call.intent, call.team_id)
     except Exception as e:
