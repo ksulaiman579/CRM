@@ -45,6 +45,20 @@ export default function ContactCenterPage() {
   const [wrap, setWrap] = useState("resolved");
   const [raiseTicket, setRaiseTicket] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [plans, setPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchWithAuth("/plans").then(async (r) => { if (r.ok) setPlans(await r.json()); }).catch(() => {});
+  }, []);
+
+  const changePlan = async (subId: number, planId: number) => {
+    if (!customer) return;
+    const res = await fetchWithAuth(`/customers/${customer.id}/subscriptions/${subId}/change-plan`, {
+      method: "POST",
+      body: JSON.stringify({ plan_id: planId }),
+    });
+    if (res.ok) loadCustomer(customer.id);
+  };
 
   const refresh = useCallback(async () => {
     const [mineRes, queueRes, ringRes] = await Promise.all([
@@ -290,10 +304,28 @@ export default function ContactCenterPage() {
                 </div>
                 {customer.overview && (
                   <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
-                    <Field label="Open tickets" value={customer.overview.open_tickets_count ?? customer.overview.open_tickets ?? "—"} />
-                    <Field label="Balance" value={customer.overview.outstanding_balance ?? customer.overview.balance ?? "—"} />
+                    <Field label="Open tickets" value={customer.overview.open_tickets_count ?? "—"} />
+                    <Field label="Balance" value={customer.overview.billing_summary ? `$${Number(customer.overview.billing_summary.current_balance ?? 0).toFixed(2)}` : "—"} />
                   </div>
                 )}
+
+                {/* Manage subscription — act on the call (e.g. a plan-change call) */}
+                {customer.overview?.active_subscriptions?.length > 0 && (
+                  <div className="border-t border-border pt-3">
+                    <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Subscription
+                      {active && (active.intent === "upgrade") && (
+                        <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">plan-change call</span>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {customer.overview.active_subscriptions.map((s: any) => (
+                        <SubRow key={s.id} sub={s} plans={plans} onApply={(pid: number) => changePlan(s.id, pid)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {customer.id && (
                   <a href={`/customers/${customer.id}`} target="_blank"
                     className="inline-block pt-1 text-xs font-medium text-accent hover:underline">
@@ -305,6 +337,43 @@ export default function ContactCenterPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SubRow({ sub, plans, onApply }: { sub: any; plans: any[]; onApply: (planId: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [pick, setPick] = useState<number | "">("");
+  return (
+    <div className="rounded-xl border border-border p-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{sub.plan_name}</div>
+          <div className="text-xs text-muted-foreground">${Number(sub.monthly_charge).toFixed(2)}/mo</div>
+        </div>
+        {!editing && (
+          <button onClick={() => setEditing(true)}
+            className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-secondary">
+            Change plan
+          </button>
+        )}
+      </div>
+      {editing && (
+        <div className="mt-2 flex items-center gap-2">
+          <select value={pick} onChange={(e) => setPick(Number(e.target.value))}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs">
+            <option value="">Select plan…</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>{p.name} — ${Number(p.monthly_price).toFixed(2)}/mo</option>
+            ))}
+          </select>
+          <button disabled={!pick} onClick={() => { if (pick) { onApply(Number(pick)); setEditing(false); setPick(""); } }}
+            className="rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background disabled:opacity-50">
+            Apply
+          </button>
+          <button onClick={() => { setEditing(false); setPick(""); }} className="text-xs text-muted-foreground">Cancel</button>
+        </div>
+      )}
     </div>
   );
 }

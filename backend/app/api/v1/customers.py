@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, status, Query, HTTPException
+from pydantic import BaseModel
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, desc
 from app.db.session import get_db
@@ -140,6 +142,45 @@ async def get_customer_overview(id: int, session: AsyncSession = Depends(get_db)
 async def get_customer_subscriptions(id: int, session: AsyncSession = Depends(get_db)):
     result = await session.execute(select(Subscription).where(Subscription.customer_id == id).order_by(desc(Subscription.start_date)))
     return result.scalars().all()
+
+class ChangePlanRequest(BaseModel):
+    plan_id: int
+
+
+@router.post("/{id}/subscriptions/{sub_id}/change-plan")
+async def change_subscription_plan(
+    id: int, sub_id: int, payload: ChangePlanRequest,
+    session: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Switch a customer's subscription to a different plan and log the action
+    as an interaction (the action a care agent takes on a plan-change call)."""
+    sub = await session.get(Subscription, sub_id)
+    if not sub or sub.customer_id != id:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    new_plan = await session.get(Plan, payload.plan_id)
+    if not new_plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+
+    old_plan_name = await session.scalar(select(Plan.name).where(Plan.id == sub.plan_id))
+    sub.plan_id = new_plan.id
+    sub.monthly_charge = new_plan.monthly_price
+
+    session.add(Interaction(
+        customer_id=id, agent_id=current_user["id"], channel="call",
+        subject="Plan change",
+        notes=f"Plan changed from {old_plan_name} to {new_plan.name} "
+              f"(now {float(new_plan.monthly_price):.2f}/mo) by {current_user['full_name']}.",
+    ))
+    await session.commit()
+    await session.refresh(sub)
+    return {
+        "subscription_id": sub.id,
+        "plan_id": new_plan.id,
+        "plan_name": new_plan.name,
+        "monthly_charge": float(sub.monthly_charge),
+    }
+
 
 @router.get("/{id}/billing")
 async def get_customer_billing(id: int, session: AsyncSession = Depends(get_db)):

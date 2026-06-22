@@ -24,6 +24,103 @@ fake = Faker()
 Faker.seed(42)
 random.seed(42)
 
+# --- Realistic telecom content (replaces lorem-ipsum) ---
+TICKET_CONTENT = {
+    "billing": [
+        ("Disputed charge on latest invoice", "Customer says this month's bill is higher than usual and wants the extra charges explained."),
+        ("Double charged for monthly plan", "Two identical charges appeared for the monthly subscription; customer requests a refund."),
+        ("Refund not yet received", "Approved refund from last month has not appeared on the customer's card."),
+        ("Request for itemized bill", "Customer would like a detailed breakdown of calls and data usage for the period."),
+    ],
+    "network": [
+        ("No signal at home address", "Customer reports complete loss of mobile signal at their home since yesterday."),
+        ("Frequent call drops", "Calls disconnect after a minute or two; happens across multiple devices."),
+        ("Slow data speeds", "Mobile data is far slower than the plan's advertised speed during evenings."),
+        ("Intermittent service outage", "Service drops several times a day for a few minutes at a time."),
+    ],
+    "technical": [
+        ("Router keeps restarting", "Home router reboots on its own every few hours, dropping the connection."),
+        ("Cannot connect to Wi-Fi", "Devices fail to connect to the home Wi-Fi after a recent power cut."),
+        ("Email configuration help", "Customer needs help setting up their email account on a new phone."),
+        ("Device not provisioning", "Newly purchased handset is not activating on the network."),
+    ],
+    "plan_change": [
+        ("Upgrade to higher data plan", "Customer wants to move to a larger data allowance starting next cycle."),
+        ("Downgrade monthly package", "Customer would like to reduce their plan to lower the monthly cost."),
+        ("Add international roaming", "Customer is travelling next week and wants a roaming add-on."),
+        ("Switch to fiber broadband", "Customer is interested in switching from DSL to a fiber plan."),
+    ],
+    "complaint": [
+        ("Unresolved issue after multiple calls", "Customer has called several times about the same fault with no resolution."),
+        ("Technician did not show up", "Scheduled engineer visit was missed; customer waited all morning."),
+        ("Long hold times", "Customer is frustrated with repeated long waits to reach an agent."),
+        ("Poor experience at retail store", "Customer reports unhelpful service during a recent store visit."),
+    ],
+    "provisioning": [
+        ("New SIM activation", "Customer needs a replacement SIM activated on their existing number."),
+        ("Number port-in request", "Customer wants to bring their existing number from another operator."),
+        ("New line setup", "Customer is adding an additional line to their account."),
+        ("eSIM activation", "Customer requests activation of an eSIM profile on their new device."),
+    ],
+    "general": [
+        ("Update contact details", "Customer wants to update the phone number and email on their account."),
+        ("Change billing date", "Customer asks to move their monthly billing date to align with payday."),
+        ("Enable paperless billing", "Customer would like to switch to electronic invoices."),
+        ("General account question", "Customer has a general question about the services on their account."),
+    ],
+}
+
+INTERACTION_POOL = [
+    ("Billing query", "Walked the customer through the charges on their latest invoice."),
+    ("Plan upgrade enquiry", "Discussed available higher-tier plans and pricing with the customer."),
+    ("Network issue reported", "Logged a coverage complaint and ran a line check; advised next steps."),
+    ("Payment taken", "Processed a one-off payment for the outstanding balance."),
+    ("SIM activation", "Activated a replacement SIM and confirmed service was restored."),
+    ("Roaming request", "Added an international roaming bundle ahead of the customer's trip."),
+    ("Address update", "Updated the customer's billing and service address on file."),
+    ("Contract renewal", "Reviewed renewal options and confirmed the customer's preferred plan."),
+    ("Speed complaint", "Investigated slow speeds; scheduled a follow-up diagnostic."),
+    ("General enquiry", "Answered a general account question and confirmed account details."),
+]
+
+KB_BY_SLUG = {
+    "troubleshooting": [
+        ("How to restart your router", "Steps to power-cycle your router and restore your connection."),
+        ("Fixing slow internet speeds", "Common causes of slow speeds and how to resolve them at home."),
+        ("Resolving dropped calls", "Troubleshooting steps for calls that disconnect unexpectedly."),
+        ("No signal: troubleshooting steps", "What to check when your device shows no network signal."),
+    ],
+    "billing-faqs": [
+        ("Understanding your monthly bill", "A breakdown of the charges that appear on a typical monthly invoice."),
+        ("Setting up auto-pay", "How to enable automatic payments and avoid late fees."),
+        ("What is a proration charge?", "Why a partial-month charge appears when you change plans mid-cycle."),
+        ("How to dispute a charge", "The process for raising and tracking a billing dispute."),
+    ],
+    "internal-procedures": [
+        ("Outage escalation procedure", "When and how to escalate a confirmed network outage."),
+        ("VIP customer handling", "Service standards and routing for VIP-segment customers."),
+        ("Refund authorization policy", "Approval thresholds and steps for issuing customer refunds."),
+        ("Complaint resolution workflow", "End-to-end steps for handling and closing a complaint."),
+    ],
+    "product-manuals": [
+        ("Fiber 1Gbps plan specifications", "Speeds, equipment and fair-use details for the 1Gbps fiber plan."),
+        ("5G mobile plan details", "Coverage, data allowances and device requirements for 5G plans."),
+        ("Router model X setup guide", "Step-by-step setup for the standard home router."),
+        ("Set-top box quick start", "Getting your TV set-top box connected and registered."),
+    ],
+}
+
+
+def _kb_body(title: str, intro: str) -> str:
+    return (
+        f"## Overview\n\n{intro}\n\n## Steps\n\n"
+        "1. Confirm the customer's account and the affected service.\n"
+        "2. Follow the checks in order, confirming the result of each.\n"
+        "3. If the issue persists, escalate per the relevant procedure.\n\n"
+        "## Notes\n\nKeep the customer informed at each step and log the outcome "
+        "on the ticket or interaction."
+    )
+
 async def seed_data(reset=False):
     async with AsyncSessionLocal() as session:
         if reset:
@@ -109,16 +206,28 @@ async def seed_data(reset=False):
         # Map team code -> id for routing seeded tickets.
         team_by_code = {t.code: t.id for t in teams}
         
-        # 3. Plans
+        # 3. Plans (realistic telecom catalog)
+        plan_defs = [
+            ("Mobile Lite",        "mobile", None,  19.99, 5),
+            ("Mobile Plus",        "mobile", None,  39.99, 50),
+            ("Mobile Unlimited",   "mobile", None,  59.99, None),
+            ("5G Premium",         "mobile", None,  89.99, None),
+            ("Fiber 100",          "fiber",  100,   39.99, None),
+            ("Fiber 300",          "fiber",  300,   59.99, None),
+            ("Fiber 1Gbps",        "fiber",  1000,  89.99, None),
+            ("DSL Basic",          "dsl",    50,    24.99, None),
+            ("DSL Home",           "dsl",    100,   34.99, None),
+            ("Home Bundle",        "bundle", 300,   99.99, None),
+            ("Family Bundle",      "bundle", 500,   120.00, None),
+            ("Business Pro",       "bundle", 1000,  149.99, None),
+        ]
         plans = []
-        for i in range(12):
-            p = Plan(
-                plan_code=f"PLAN-{i+1}", name=f"Plan {fake.word().capitalize()}", description=fake.sentence(),
-                plan_type=random.choice(["mobile", "fiber", "dsl", "bundle"]), speed_mbps=random.choice([100, 300, 1000]),
-                monthly_price=random.choice([19.99, 39.99, 59.99, 89.99, 120.00]),
-                data_cap_gb=random.choice([None, 50, 100, 500])
-            )
-            plans.append(p)
+        for i, (name, ptype, speed, price, cap) in enumerate(plan_defs):
+            plans.append(Plan(
+                plan_code=f"PLAN-{i+1}", name=name,
+                description=f"{name} — {ptype} plan.",
+                plan_type=ptype, speed_mbps=speed, monthly_price=price, data_cap_gb=cap,
+            ))
         session.add_all(plans)
         await session.flush()
         
@@ -179,12 +288,13 @@ async def seed_data(reset=False):
                 
             # Interactions
             for _ in range(random.randint(1, 4)):
+                subj, note = random.choice(INTERACTION_POOL)
                 interaction = Interaction(
                     customer_id=c.id,
                     agent_id=random.choice(users).id,
                     channel=random.choice(["call", "email", "chat"]),
-                    subject=fake.sentence(nb_words=4),
-                    notes=fake.paragraph()
+                    subject=subj,
+                    notes=note,
                 )
                 session.add(interaction)
                 
@@ -199,11 +309,12 @@ async def seed_data(reset=False):
             
             cat = random.choice(["billing", "network", "technical", "plan_change", "complaint", "provisioning", "general"])
             from app.core.routing import CATEGORY_TO_TEAM_CODE, DEFAULT_TEAM_CODE
+            subj, desc_text = random.choice(TICKET_CONTENT[cat])
             t = Ticket(
                 ticket_number=f"TKT-{fake.unique.random_int(min=10000, max=99999)}",
                 customer_id=cust.id,
-                subject=fake.sentence(),
-                description=fake.paragraph(),
+                subject=subj,
+                description=desc_text,
                 category=cat,
                 team_id=team_by_code.get(CATEGORY_TO_TEAM_CODE.get(cat, DEFAULT_TEAM_CODE)),
                 priority=policy.priority,
@@ -248,14 +359,14 @@ async def seed_data(reset=False):
         articles = []
         for i in range(40):
             cat = random.choice(categories)
-            title = fake.sentence(nb_words=6)
-            slug = title.lower().replace(" ", "-").replace(".", "") + f"-{i}"
+            title, intro = random.choice(KB_BY_SLUG.get(cat.slug, KB_BY_SLUG["troubleshooting"]))
+            slug = title.lower().replace(" ", "-").replace("?", "").replace(":", "").replace(".", "") + f"-{i}"
             article = KbArticle(
                 title=title,
                 slug=slug,
                 category_id=cat.id,
-                body=f"## Overview\n\n{fake.paragraph(nb_sentences=5)}\n\n## Steps to Resolve\n\n1. {fake.sentence()}\n2. {fake.sentence()}\n3. {fake.sentence()}\n\n## Conclusion\n\n{fake.paragraph()}",
-                tags=[fake.word(), fake.word(), fake.word()],
+                body=_kb_body(title, intro),
+                tags=[cat.slug, "telecom", "support"],
                 status="published",
                 author_id=random.choice(users).id,
                 view_count=random.randint(0, 500)
