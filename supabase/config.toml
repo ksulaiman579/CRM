@@ -1,0 +1,6 @@
+# Supabase project link for the GitHub integration.
+# NOTE: This project's database schema is managed by Alembic
+# (see backend/alembic/), NOT by Supabase SQL migrations. The
+# migrations/ folder is intentionally empty so the Supabase
+# integration does not apply a competing/parallel schema.
+project_id = "sawpaohycijkeefsslib"
