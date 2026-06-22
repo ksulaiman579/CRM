@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from app.db.session import AsyncSessionLocal
 from app.models.ticket import Ticket
 from app.models.billing import Invoice
@@ -50,6 +50,25 @@ async def sweep_sla_breaches():
     except Exception as e:
         logger.error(f"Error in SLA sweep job: {e}")
 
+async def generate_inbound_calls():
+    """Periodically inject a simulated inbound call, capped so the queue can't run away."""
+    try:
+        async with AsyncSessionLocal() as session:
+            from app.models.call import Call
+            from app.core.acd import generate_call
+            live = await session.scalar(
+                select(func.count()).select_from(Call).where(Call.status.in_(["queued", "ringing", "active"]))
+            ) or 0
+            if live >= 15:
+                logger.debug("Call generator: queue at cap (%s), skipping.", live)
+                return
+            call = await generate_call(session)
+            if call:
+                logger.info("Call generator: created %s (intent=%s, team=%s).", call.call_number, call.intent, call.team_id)
+    except Exception as e:
+        logger.error(f"Error in call generator job: {e}")
+
+
 async def sweep_overdue_invoices():
     """
     Background job to check pending invoices and flag them as overdue if past the due date.
@@ -86,6 +105,8 @@ def setup_scheduler(scheduler):
     scheduler.add_job(sweep_overdue_invoices, "interval", minutes=5, id="sweep_invoices", replace_existing=True)
     # Refresh dashboard cache every 5 minutes
     scheduler.add_job(refresh_dashboard_cache, "interval", minutes=5, id="refresh_dash_cache", replace_existing=True)
+    # Simulate inbound calls every 45 seconds (capped in the job itself)
+    scheduler.add_job(generate_inbound_calls, "interval", seconds=45, id="generate_calls", replace_existing=True)
     logger.info("Background jobs registered.")
 
 async def refresh_dashboard_cache():

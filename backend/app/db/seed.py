@@ -28,7 +28,7 @@ async def seed_data(reset=False):
         if reset:
             print("Resetting seeded data...")
             tables = [
-                "ticket_comments", "tickets", "payments", "line_items", "invoices",
+                "calls", "ticket_comments", "tickets", "payments", "line_items", "invoices",
                 "devices", "subscriptions", "interactions", "customers",
                 "kb_articles", "kb_categories", "plan_features", "addons", "plans",
                 "sla_policies", "audit_log", "users", "teams",
@@ -249,9 +249,39 @@ async def seed_data(reset=False):
             )
             articles.append(article)
         session.add_all(articles)
-        
+
+        # 7. Call history (completed simulated calls) for contact-center views/analytics.
+        from app.models.call import Call
+        from app.core.acd import INTENT_TEMPLATES
+        import uuid as _uuid
+        agents = [u for u in users if u.role == "agent"]
+        agents_by_team = {}
+        for a in agents:
+            agents_by_team.setdefault(a.team_id, []).append(a)
+        for _ in range(50):
+            intent = random.choice(list(INTENT_TEMPLATES.keys()))
+            team_code, lines = INTENT_TEMPLATES[intent]
+            team_id = team_by_code.get(team_code)
+            team_agents = agents_by_team.get(team_id) or agents
+            agent = random.choice(team_agents)
+            cust = random.choice(customers)
+            queued = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 14), minutes=random.randint(0, 600))
+            answered = queued + timedelta(seconds=random.randint(5, 60))
+            ended = answered + timedelta(seconds=random.randint(60, 900))
+            disposition = random.choices(["completed", "missed", "abandoned"], weights=[85, 8, 7])[0]
+            session.add(Call(
+                call_number=f"CALL-{_uuid.uuid4().hex[:8].upper()}",
+                customer_id=cust.id, team_id=team_id, intent=intent,
+                opening_line=random.choice(lines).format(name=cust.first_name),
+                status=disposition,
+                assigned_agent_id=agent.id if disposition != "missed" else None,
+                queued_at=queued,
+                answered_at=answered if disposition == "completed" else None,
+                ended_at=ended if disposition != "missed" else None,
+            ))
+
         await session.commit()
-        print("Seeded successfully: 120 customers (with 360 data), 200 tickets, 5 teams, 5 supervisors + 10 agents, 12 plans, 40 KB articles.")
+        print("Seeded successfully: 120 customers (with 360 data), 200 tickets, 50 calls, 5 teams, 5 supervisors + 10 agents, 12 plans, 40 KB articles.")
 
 if __name__ == "__main__":
     reset = "--reset" in sys.argv

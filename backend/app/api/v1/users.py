@@ -38,6 +38,12 @@ async def set_my_status(
         "id": user.id, "full_name": user.full_name,
         "status": user.status, "team_id": user.team_id,
     })
+
+    # Going 'ready' pulls the oldest queued call on the agent's team, if any.
+    if user.status == "ready":
+        from app.core.acd import pull_queued_for_agent
+        await pull_queued_for_agent(session, user)
+
     return user
 
 
