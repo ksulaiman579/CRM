@@ -38,7 +38,7 @@ async def seed_data(reset=False):
         if not existing_admin:
             session.add(User(
                 username="admin",
-                email="admin@telecom-crm.local",
+                email="admin@telecom-crm.com",
                 full_name="System Administrator",
                 password_hash=hash_password("admin"),
                 role="superuser",

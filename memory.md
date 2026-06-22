@@ -160,7 +160,7 @@
 
 | Role | Username | Password | Email | Notes |
 |------|----------|----------|-------|-------|
-| Superuser | admin | admin | admin@telecom-crm.local | seeded fixed; provisions all users |
+| Superuser | admin | admin | admin@telecom-crm.com | seeded fixed; provisions all users |
 | Supervisor | supervisor1 | password123 | supervisor1@example.com | from seed |
 | Agent | agent1 | password123 | agent1@example.com | from seed |
 

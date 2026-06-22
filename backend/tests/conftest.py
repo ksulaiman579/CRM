@@ -58,7 +58,7 @@ async def setup_test_db():
 
         # Fixed superuser used by tests to provision other accounts.
         session.add(User(
-            username="admin", email="admin@telecom-crm.local", full_name="System Administrator",
+            username="admin", email="admin@telecom-crm.com", full_name="System Administrator",
             password_hash=hash_password("admin"), role="superuser", must_change_password=False,
         ))
 
