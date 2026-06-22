@@ -1,0 +1,29 @@
+# Render Blueprint for the Telecom CRM backend (FastAPI).
+# Frontend (Next.js) deploys separately on Vercel.
+#
+# IMPORTANT: single instance / single worker only — the app runs in-process
+# background jobs (APScheduler call generator + SLA sweeps). Multiple instances
+# would duplicate them.
+services:
+  - type: web
+    name: telecom-crm-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    numInstances: 1
+    region: singapore            # closest Render region to the Supabase ap-northeast-2 project
+    healthCheckPath: /health
+    # Migrations run on every deploy (idempotent), then the API starts.
+    buildCommand: "pip install -r requirements.txt && alembic upgrade head"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"
+    envVars:
+      - key: DATABASE_URL          # Supabase SESSION pooler (port 5432) — IPv4 + migration-safe
+        sync: false                # set in the Render dashboard (secret)
+      - key: SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS          # e.g. https://your-app.vercel.app
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_DISABLE_STATEMENT_CACHE
+        value: "true"
