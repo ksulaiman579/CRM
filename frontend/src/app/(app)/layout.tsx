@@ -1,86 +1,141 @@
 "use client";
 
 import { useAuth } from "@/lib/auth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
-import { LayoutDashboard, Ticket, Users, FileText, CreditCard, Search, LogOut } from "lucide-react";
+import {
+  LayoutDashboard, Headphones, Ticket, Users, FileText, CreditCard,
+  Search, LogOut, BookOpen, ShieldCheck,
+} from "lucide-react";
+import AgentStatusControl from "@/components/AgentStatusControl";
+
+const NAV = [
+  {
+    group: "Workspace",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/contact-center", label: "Contact Center", icon: Headphones },
+      { href: "/tickets", label: "Tickets", icon: Ticket },
+      { href: "/customers", label: "Customers", icon: Users },
+    ],
+  },
+  {
+    group: "Catalog",
+    items: [
+      { href: "/billing", label: "Billing", icon: CreditCard },
+      { href: "/plans", label: "Plans & Addons", icon: FileText },
+      { href: "/kb", label: "Knowledge Base", icon: BookOpen },
+    ],
+  },
+];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-    if (user?.must_change_password) {
-      router.push("/change-password");
-    }
+    if (!loading && !user) router.push("/login");
+    if (user?.must_change_password) router.push("/change-password");
   }, [user, loading, router]);
 
-  if (loading || !user) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">Loading...</div>;
+  if (loading || !user)
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    );
+
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  const showStatus = user.role === "agent" || user.role === "supervisor";
 
   return (
-    <div className="flex h-screen bg-slate-900 text-slate-300">
+    <div className="flex h-screen bg-background text-foreground">
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
-        <div className="p-4 text-xl font-bold text-white border-b border-slate-700">
-          Telecom CRM
+      <aside className="w-64 shrink-0 bg-card border-r border-border flex flex-col">
+        <div className="px-5 h-16 flex items-center gap-2 border-b border-border">
+          <div className="h-8 w-8 rounded-lg bg-foreground text-background grid place-items-center font-bold">T</div>
+          <span className="font-semibold tracking-tight">Telecom CRM</span>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
-          <Link href="/" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-            <LayoutDashboard size={20} /> Dashboard
-          </Link>
-          <Link href="/tickets" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-            <Ticket size={20} /> Tickets
-          </Link>
-          <Link href="/customers" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-            <Users size={20} /> Customers
-          </Link>
-          <Link href="/billing" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-            <CreditCard size={20} /> Billing
-          </Link>
-          <Link href="/plans" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-            <FileText size={20} /> Plans & Addons
-          </Link>
-          <Link href="/kb" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-            <Search size={20} /> Knowledge Base
-          </Link>
+        <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-6">
+          {NAV.map((section) => (
+            <div key={section.group}>
+              <div className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {section.group}
+              </div>
+              <div className="space-y-0.5">
+                {section.items.map(({ href, label, icon: Icon }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive(href)
+                        ? "bg-accent/10 text-accent"
+                        : "text-foreground/70 hover:bg-secondary hover:text-foreground"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
           {user.role === "superuser" && (
-            <Link href="/users" className="flex items-center gap-3 p-2 hover:bg-slate-700 rounded transition-colors text-slate-200">
-              <Users size={20} /> Manage Users
-            </Link>
+            <div>
+              <div className="px-3 mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Admin
+              </div>
+              <Link
+                href="/users"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive("/users") ? "bg-accent/10 text-accent" : "text-foreground/70 hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                <ShieldCheck size={18} /> Manage Users
+              </Link>
+            </div>
           )}
         </nav>
-        <div className="p-4 border-t border-slate-700 flex items-center justify-between">
-          <Link href="/profile" className="text-sm hover:text-white transition-colors cursor-pointer group">
-            <div className="font-semibold text-slate-200 group-hover:text-white">{user.full_name}</div>
-            <div className="text-xs text-slate-400 capitalize">{user.role}</div>
+        <div className="border-t border-border p-3">
+          <Link href="/profile" className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-secondary transition-colors">
+            <div className="h-9 w-9 rounded-full bg-accent/15 text-accent grid place-items-center text-sm font-semibold">
+              {user.full_name?.[0] || "U"}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{user.full_name}</div>
+              <div className="text-xs capitalize text-muted-foreground">{user.role}</div>
+            </div>
           </Link>
-          <button onClick={logout} className="text-slate-400 hover:text-white" title="Log Out">
-            <LogOut size={20} />
-          </button>
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-slate-700 bg-slate-800 flex items-center px-8">
-          <div className="flex-1">
-            <div className="relative w-96">
-              <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-              <input 
-                type="text" 
-                placeholder="Global search (customers, tickets)..." 
-                className="w-full bg-slate-900 border border-slate-700 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-indigo-500 text-white"
-              />
-            </div>
+        <header className="h-16 shrink-0 border-b border-border bg-card/80 backdrop-blur flex items-center gap-4 px-6">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-2.5 text-muted-foreground" size={16} />
+            <input
+              type="text"
+              placeholder="Search customers, tickets…"
+              className="w-full rounded-full border border-border bg-background py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+            />
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            {showStatus && <AgentStatusControl initial={user.status} />}
+            <button
+              onClick={logout}
+              title="Log out"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </header>
-        <div className="flex-1 overflow-auto p-8">
-          {children}
-        </div>
+        <div className="flex-1 overflow-auto scrollbar-thin p-6">{children}</div>
       </main>
     </div>
   );

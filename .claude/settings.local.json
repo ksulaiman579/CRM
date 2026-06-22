@@ -19,7 +19,8 @@
       "WebFetch(domain:github.com)",
       "Bash(cp /tmp/status_check.py ./_tmp_check.py)",
       "Bash(./.venv/Scripts/python.exe ./_tmp_check.py)",
-      "Bash(rm -f ./_tmp_check.py)"
+      "Bash(rm -f ./_tmp_check.py)",
+      "PowerShell(Start-Sleep -Seconds 12; Get-Content \"C:\\\\Users\\\\ADMINI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Administrator-Desktop-Projects-CRM\\\\5a999e24-473b-49d8-869e-ea428f54f998\\\\tasks\\\\b0su0bve6.output\" -Tail 5; try { Invoke-WebRequest http://127.0.0.1:3000/login -UseBasicParsing -TimeoutSec 40 | Out-Null; Write-Output \"login page: 200 OK\" } catch { $_.Exception.Message })"
     ]
   }
 }
