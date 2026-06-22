@@ -68,11 +68,16 @@ async def seed_data(reset=False):
 
         print("Seeding database...")
         
-        # 1. Teams & SLAs
-        team1 = Team(name="Tier 1 Support", description="First line support")
-        team2 = Team(name="Tier 2 Technical", description="Advanced technical support")
-        team3 = Team(name="Billing Support", description="Billing inquiries")
-        session.add_all([team1, team2, team3])
+        # 1. Teams (functional, with stable routing codes) & SLAs
+        team_defs = [
+            ("Sales", "sales", "Sales, upgrades and plan changes"),
+            ("Complaints", "complaints", "Customer complaints and escalations"),
+            ("Call Center", "call_center", "Inbound call queries and raised tickets"),
+            ("Technical", "technical", "Network and technical support"),
+            ("Billing", "billing", "Billing and payment inquiries"),
+        ]
+        teams = [Team(name=n, code=c, description=d) for n, c, d in team_defs]
+        session.add_all(teams)
         
         sla_low = SlaPolicy(name="Low Priority", priority="low", first_response_mins=480, resolution_mins=7200)
         sla_med = SlaPolicy(name="Medium Priority", priority="medium", first_response_mins=240, resolution_mins=1440)
@@ -82,17 +87,26 @@ async def seed_data(reset=False):
         
         await session.flush()
         
-        # 2. Users (2 supervisors, 7 agents)
+        # 2. Users: one supervisor per team, plus agents distributed across teams.
         users = []
         pw_hash = hash_password("password123")
-        for i in range(2):
-            u = User(username=f"supervisor{i+1}", email=f"supervisor{i+1}@example.com", full_name=fake.name(), password_hash=pw_hash, role="supervisor", team_id=team1.id)
-            users.append(u)
-        for i in range(7):
-            u = User(username=f"agent{i+1}", email=f"agent{i+1}@example.com", full_name=fake.name(), password_hash=pw_hash, role="agent", team_id=random.choice([team1.id, team2.id, team3.id]))
-            users.append(u)
+        for i, team in enumerate(teams):
+            users.append(User(
+                username=f"supervisor{i+1}", email=f"supervisor{i+1}@example.com",
+                full_name=fake.name(), password_hash=pw_hash, role="supervisor", team_id=team.id,
+            ))
+        # 10 agents, ~2 per team, round-robin across teams.
+        for i in range(10):
+            team = teams[i % len(teams)]
+            users.append(User(
+                username=f"agent{i+1}", email=f"agent{i+1}@example.com",
+                full_name=fake.name(), password_hash=pw_hash, role="agent", team_id=team.id,
+            ))
         session.add_all(users)
         await session.flush()
+
+        # Map team code -> id for routing seeded tickets.
+        team_by_code = {t.code: t.id for t in teams}
         
         # 3. Plans
         plans = []
@@ -182,12 +196,15 @@ async def seed_data(reset=False):
             created_at = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
             policy = random.choice(slas)
             
+            cat = random.choice(["billing", "network", "technical", "plan_change", "complaint", "provisioning", "general"])
+            from app.core.routing import CATEGORY_TO_TEAM_CODE, DEFAULT_TEAM_CODE
             t = Ticket(
                 ticket_number=f"TKT-{fake.unique.random_int(min=10000, max=99999)}",
                 customer_id=cust.id,
                 subject=fake.sentence(),
                 description=fake.paragraph(),
-                category=random.choice(["billing", "network", "technical", "plan_change", "complaint", "provisioning", "general"]),
+                category=cat,
+                team_id=team_by_code.get(CATEGORY_TO_TEAM_CODE.get(cat, DEFAULT_TEAM_CODE)),
                 priority=policy.priority,
                 status=random.choices(["open", "in_progress", "pending_customer", "escalated", "resolved", "closed"], weights=[20, 30, 10, 5, 20, 15])[0],
                 channel=random.choice(["call", "email", "chat", "web"]),
@@ -234,7 +251,7 @@ async def seed_data(reset=False):
         session.add_all(articles)
         
         await session.commit()
-        print("Seeded successfully: 120 customers (with 360 data), 200 tickets, 9 agents, 12 plans, 40 KB articles.")
+        print("Seeded successfully: 120 customers (with 360 data), 200 tickets, 5 teams, 5 supervisors + 10 agents, 12 plans, 40 KB articles.")
 
 if __name__ == "__main__":
     reset = "--reset" in sys.argv

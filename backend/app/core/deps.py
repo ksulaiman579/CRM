@@ -37,6 +37,7 @@ async def get_current_user(
         "full_name": user.full_name,
         "role": user.role,
         "team_id": user.team_id,
+        "status": user.status,
         "must_change_password": user.must_change_password,
         "is_active": user.is_active,
         "created_at": user.created_at

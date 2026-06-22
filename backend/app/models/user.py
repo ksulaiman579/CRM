@@ -5,9 +5,11 @@ from app.db.base import Base
 
 class Team(Base):
     __tablename__ = "teams"
-    
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Stable routing key: 'sales' | 'complaints' | 'call_center' | 'technical' | 'billing'
+    code: Mapped[str | None] = mapped_column(Text, nullable=True, unique=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 class User(Base):
@@ -21,6 +23,10 @@ class User(Base):
     role: Mapped[str] = mapped_column(Text, nullable=False, default="agent") # 'superuser', 'supervisor', 'agent'
     team_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("teams.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Contact-center presence: 'offline' | 'ready' | 'on_call' | 'wrap_up'
+    #   | 'break' | 'lunch' | 'restroom' | 'meeting'. Only 'ready' agents get calls.
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="offline", server_default="offline")
+    status_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

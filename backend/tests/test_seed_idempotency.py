@@ -17,8 +17,8 @@ async def test_seed_idempotency(db_session):
     plan_count_1 = await db_session.scalar(select(func.count()).select_from(Plan))
     user_count_1 = await db_session.scalar(select(func.count()).select_from(User))
     
-    assert customer_count_1 == 110
-    assert ticket_count_1 == 150
+    assert customer_count_1 == 120
+    assert ticket_count_1 == 200
     assert plan_count_1 == 12
     # 9 seeded users + any registered users (from other tests if run sequentially, but this is fine)
     assert user_count_1 >= 9

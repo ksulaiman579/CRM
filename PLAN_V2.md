@@ -136,4 +136,7 @@ P4 Design polish pass            (command palette, dashboards, consistency)
   - Optimistic concurrency: `tickets.version` column + migration `a1c2e3f4b5d6`, `version` token on PATCH, CRM-TKT-005 on stale write.
   - Per-ticket presence via SSE (`ticket_viewing`/`ticket_released`); frontend collision banner + version-aware updates + claim/release/conflict UI.
   - Tests updated to the provisioned-account model (`tests/_helpers.py`, seeded superuser in `conftest.py`); **not yet executed** — no local venv/pytest. Run in CI/Supabase.
-- **Next: Phase 3** (seed 120+ customers) then **Phase 2** (full-CRM modules), applying the design system, with **Phase 4** dark/light polish.
+- **Phase 3 (light slice) — DONE.** Idempotent `--reset` seed; 120 customers / 200 tickets; live on Supabase.
+- **Phase 2 — IN PROGRESS** (Contact Center folded in). Build order: (1) functional teams + agent status ✅, (2) Accounts/Contacts, (3) Sales pipeline, (4) Activities/Tasks, (5) Contact-Center call simulator, (6) Campaigns/Notes/Analytics.
+  - **2.1 DONE:** 5 functional teams (Sales, Complaints, Call Center, Technical, Billing) with `Team.code`; skill-based routing (`app/core/routing.py`, category→team) on ticket create + seed; agent presence `User.status` (ready/on_call/wrap_up/break/lunch/restroom/meeting/offline) via `POST /users/me/status` + SSE `agent_status_changed`. Migration `c3e4f5a6b7d8`. Verified live.
+- Then **Phase 4** dark/light executive UI polish.

@@ -19,6 +19,9 @@ class AdminUserCreate(BaseModel):
 class AdminPasswordReset(BaseModel):
     new_password: str
 
+class StatusUpdate(BaseModel):
+    status: str
+
 class TeamResponse(BaseModel):
     id: int
     name: str

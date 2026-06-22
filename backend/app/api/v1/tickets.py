@@ -75,11 +75,17 @@ async def create_ticket(
     current_user: dict = Depends(get_current_user)
 ):
     ticket_num = f"TKT-{uuid.uuid4().hex[:8].upper()}"
-    
+
     # lookup SLA policy
     policy_res = await session.execute(select(SlaPolicy).where(SlaPolicy.priority == request.priority, SlaPolicy.is_active == True))
     policy = policy_res.scalars().first()
-    
+
+    # Skill-based routing: if no team was specified, route by category.
+    from app.core.routing import resolve_team_id
+    team_id = request.team_id
+    if team_id is None:
+        team_id = await resolve_team_id(session, request.category)
+
     new_ticket = Ticket(
         ticket_number=ticket_num,
         customer_id=request.customer_id,
@@ -88,7 +94,7 @@ async def create_ticket(
         category=request.category,
         priority=request.priority,
         channel=request.channel,
-        team_id=request.team_id,
+        team_id=team_id,
         assigned_agent_id=request.assigned_agent_id,
         created_by=current_user["id"]
     )

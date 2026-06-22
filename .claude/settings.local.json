@@ -15,7 +15,11 @@
       "PowerShell(cd C:\\\\Users\\\\Administrator\\\\Desktop\\\\Projects\\\\CRM; git --version; git rev-parse --is-inside-work-tree 2>$null; if \\(-not $?\\) { git init | Out-Null; git symbolic-ref HEAD refs/heads/main }; git add -A; Write-Output \"=== Tracked files matching env/venv/secrets \\(should be EMPTY\\) ===\"; git ls-files | Select-String -Pattern '\\\\.env$|\\\\.venv/|node_modules/|\\\\.db$|__pycache__'; Write-Output \"=== END \\(empty above = good\\) ===\"; Write-Output \"Total files staged:\"; \\(git ls-files | Measure-Object -Line\\).Lines)",
       "PowerShell($sshDir = \"$env:USERPROFILE\\\\.ssh\"; Remove-Item \"$sshDir\\\\id_ed25519\",\"$sshDir\\\\id_ed25519.pub\" -ErrorAction SilentlyContinue; ssh-keygen -t ed25519 -C \"ksulaiman579\" -f \"$sshDir\\\\id_ed25519\" -N '\"\"' 2>&1 | Out-Null; Write-Output \"=== NEW PUBLIC KEY ===\"; Get-Content \"$sshDir\\\\id_ed25519.pub\")",
       "Bash(mkdir -p supabase/migrations)",
-      "Bash(./.venv/Scripts/python.exe -c ' *)"
+      "Bash(./.venv/Scripts/python.exe -c ' *)",
+      "WebFetch(domain:github.com)",
+      "Bash(cp /tmp/status_check.py ./_tmp_check.py)",
+      "Bash(./.venv/Scripts/python.exe ./_tmp_check.py)",
+      "Bash(rm -f ./_tmp_check.py)"
     ]
   }
 }

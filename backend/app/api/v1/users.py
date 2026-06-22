@@ -2,16 +2,43 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.db.session import get_db
-from app.schemas.user import AdminUserCreate, AdminPasswordReset, UserUpdate
+from datetime import datetime, timezone
+from app.schemas.user import AdminUserCreate, AdminPasswordReset, UserUpdate, StatusUpdate
 from app.schemas.auth import UserResponse
 from app.models.user import User, AuditLog
 from app.core.deps import get_current_user, require_role, get_current_superuser
 from app.core.security import hash_password
 from app.core.errors import AppError
+from app.core.events import broadcast_event
 
 router = APIRouter()
 
 ALLOWED_ROLES = {"agent", "supervisor", "superuser"}
+ALLOWED_STATUSES = {"offline", "ready", "on_call", "wrap_up", "break", "lunch", "restroom", "meeting"}
+
+
+@router.post("/me/status", response_model=UserResponse)
+async def set_my_status(
+    payload: StatusUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Self-service contact-center presence change. Only 'ready' agents receive calls."""
+    if payload.status not in ALLOWED_STATUSES:
+        raise AppError("CRM-USER-001", f"Invalid status '{payload.status}'", status.HTTP_400_BAD_REQUEST)
+
+    result = await session.execute(select(User).where(User.id == current_user["id"]))
+    user = result.scalar_one()
+    user.status = payload.status
+    user.status_changed_at = datetime.now(timezone.utc)
+    await session.commit()
+    await session.refresh(user)
+
+    await broadcast_event("agent_status_changed", {
+        "id": user.id, "full_name": user.full_name,
+        "status": user.status, "team_id": user.team_id,
+    })
+    return user
 
 
 @router.get("", response_model=list[UserResponse])

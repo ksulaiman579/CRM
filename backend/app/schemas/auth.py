@@ -7,6 +7,8 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     role: str
+    team_id: int | None = None
+    status: str = "offline"
     must_change_password: bool
     is_active: bool
     created_at: datetime
