@@ -26,10 +26,24 @@ random.seed(42)
 async def seed_data(reset=False):
     async with AsyncSessionLocal() as session:
         if reset:
-            print("Resetting database (dropping tables requires alembic, here we just delete rows).")
-            # For SQLite, DELETE FROM table is easier, but be careful with foreign keys. 
-            # We'll rely on the user to rebuild the DB or just run the seed once.
-            pass
+            print("Resetting seeded data...")
+            tables = [
+                "ticket_comments", "tickets", "payments", "line_items", "invoices",
+                "devices", "subscriptions", "interactions", "customers",
+                "kb_articles", "kb_categories", "plan_features", "addons", "plans",
+                "sla_policies", "audit_log", "users", "teams",
+            ]
+            dialect = session.bind.dialect.name
+            if dialect == "postgresql":
+                await session.execute(text(
+                    "TRUNCATE TABLE " + ", ".join(tables) + " RESTART IDENTITY CASCADE"
+                ))
+            else:
+                await session.execute(text("PRAGMA foreign_keys=OFF"))
+                for t in tables:
+                    await session.execute(text(f"DELETE FROM {t}"))
+            await session.commit()
+            print("Reset complete.")
 
         # Fixed superuser (admin/admin) — DEMO ONLY, not for deployment.
         # Provisions all other accounts. Seeded idempotently, independent of
@@ -95,7 +109,7 @@ async def seed_data(reset=False):
         
         # 4. Customers & 360 Data
         customers = []
-        for i in range(110):
+        for i in range(120):
             c = Customer(
                 account_number=f"TC-{fake.unique.random_int(min=100000, max=999999)}",
                 first_name=fake.first_name(),
@@ -163,7 +177,7 @@ async def seed_data(reset=False):
         
         # 5. Tickets
         slas = [sla_low, sla_med, sla_high, sla_crit]
-        for i in range(150):
+        for i in range(200):
             cust = random.choice(customers)
             created_at = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
             policy = random.choice(slas)
@@ -220,11 +234,8 @@ async def seed_data(reset=False):
         session.add_all(articles)
         
         await session.commit()
-        print("Seeded successfully: 110 customers (with 360 data), 150 tickets, 9 agents, 12 plans, 40 KB articles.")
+        print("Seeded successfully: 120 customers (with 360 data), 200 tickets, 9 agents, 12 plans, 40 KB articles.")
 
 if __name__ == "__main__":
-    reset = False
-    if "--reset" in sys.argv:
-        reset = True
-        print("Resetting is not fully implemented in code, please delete sqlite.db and run alembic upgrade head.")
+    reset = "--reset" in sys.argv
     asyncio.run(seed_data(reset=reset))
