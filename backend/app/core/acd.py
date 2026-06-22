@@ -126,12 +126,20 @@ async def distribute_call(session: AsyncSession, call: Call) -> bool:
 
 
 async def pull_queued_for_agent(session: AsyncSession, user: User) -> bool:
-    """When an agent goes 'ready', offer them the oldest queued call on their team."""
+    """When an agent goes 'ready', offer them the next queued call on their team.
+
+    VIP customers jump the queue: order by VIP-first, then oldest-waiting.
+    """
     if user.role != "agent" or user.status != "ready":
         return False
+    from sqlalchemy import case
+    vip_first = case((Customer.segment == "vip", 0), else_=1)
     call = (await session.execute(
-        select(Call).where(Call.status == "queued", Call.team_id == user.team_id)
-        .order_by(Call.queued_at.asc()).limit(1)
+        select(Call)
+        .join(Customer, Customer.id == Call.customer_id)
+        .where(Call.status == "queued", Call.team_id == user.team_id)
+        .order_by(vip_first.asc(), Call.queued_at.asc())
+        .limit(1)
     )).scalar_one_or_none()
     if not call:
         return False
